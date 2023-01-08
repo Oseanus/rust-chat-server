@@ -8,10 +8,10 @@ use tokio::{
 async fn main() {
     let addr = "127.0.0.1:8080";
     let listener = TcpListener::bind(addr).await.unwrap();
-    let (tx, _) = broadcast::channel::<String>(10);
+    let (tx, _) = broadcast::channel(10);
 
     loop {
-        let (mut socket, _) = listener.accept().await.unwrap();
+        let (mut socket, client_addr) = listener.accept().await.unwrap();
         let tx = tx.clone();
         let mut rx = tx.subscribe();
 
@@ -31,15 +31,18 @@ async fn main() {
                         }
 
                         // Sending message as broadcast
-                        tx.send(line.clone()).unwrap();
+                        tx.send((line.clone(), client_addr)).unwrap();
                         line.clear();
                     }
 
                     // Receive message
                     // Returns a future
                     result = rx.recv() => {
-                        let message = result.unwrap();
-                        writer.write_all(&message.as_bytes()).await.unwrap();
+                        let (message, other_addr) = result.unwrap();
+
+                        if client_addr != other_addr {
+                            writer.write_all(&message.as_bytes()).await.unwrap();
+                        }
                     }
                 }
             }
