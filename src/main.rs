@@ -15,7 +15,7 @@ async fn main() {
         let tx = tx.clone();
         let mut rx = tx.subscribe();
 
-        // Spawn for each new cient an own task
+        // Spawn for each new client an own task
         tokio::spawn(async move {
             let (read, mut writer) = socket.split();
             let mut reader = BufReader::new(read);
@@ -35,7 +35,7 @@ async fn main() {
                         line.clear();
                     }
 
-                    // Receive message
+                    // Receives message
                     // Returns a future
                     result = rx.recv() => {
                         let (message, other_addr) = result.unwrap();
