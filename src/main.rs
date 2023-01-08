@@ -1,31 +1,47 @@
 use tokio::{
     net::TcpListener, 
-    io::{AsyncWriteExt, BufReader, AsyncBufReadExt}
+    sync::broadcast,
+    io::{AsyncWriteExt, BufReader, AsyncBufReadExt},
 };
 
 #[tokio::main]
 async fn main() {
     let addr = "127.0.0.1:8080";
     let listener = TcpListener::bind(addr).await.unwrap();
+    let (tx, _) = broadcast::channel::<String>(10);
 
     loop {
         let (mut socket, _) = listener.accept().await.unwrap();
+        let tx = tx.clone();
+        let mut rx = tx.subscribe();
 
-        
+        // Spawn for each new cient an own task
         tokio::spawn(async move {
             let (read, mut writer) = socket.split();
             let mut reader = BufReader::new(read);
             let mut line = String::new();
             
             loop{
-                let bytes_read = reader.read_line(&mut line).await.unwrap();
-    
-                if bytes_read == 0 {
-                    break;
+                tokio::select! {
+                    // Reads line
+                    // Returns a future
+                    result = reader.read_line(&mut line) => {
+                        if result.unwrap() == 0 {
+                            break;
+                        }
+
+                        // Sending message as broadcast
+                        tx.send(line.clone()).unwrap();
+                        line.clear();
+                    }
+
+                    // Receive message
+                    // Returns a future
+                    result = rx.recv() => {
+                        let message = result.unwrap();
+                        writer.write_all(&message.as_bytes()).await.unwrap();
+                    }
                 }
-    
-                writer.write_all(&line.as_bytes()).await.unwrap();
-                line.clear();
             }
         });
     }
